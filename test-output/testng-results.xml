@@ -2,16 +2,16 @@
 <testng-results ignored="0" total="1" passed="1" failed="0" skipped="0">
   <reporter-output>
   </reporter-output>
-  <suite started-at="2024-06-13T12:22:54 IST" name="Default suite" finished-at="2024-06-13T12:23:00 IST" duration-ms="6088">
+  <suite started-at="2025-02-17T12:27:35 IST" name="Default suite" finished-at="2025-02-17T12:28:42 IST" duration-ms="66860">
     <groups>
     </groups>
-    <test started-at="2024-06-13T12:22:54 IST" name="Default test" finished-at="2024-06-13T12:23:00 IST" duration-ms="6088">
-      <class name="com.test.Database_Testing.demo">
-        <test-method signature="testDB()[pri:0, instance:com.test.Database_Testing.demo@7205765b]" started-at="2024-06-13T12:22:54 IST" name="testDB" finished-at="2024-06-13T12:23:00 IST" duration-ms="6067" status="PASS">
+    <test started-at="2025-02-17T12:27:35 IST" name="Default test" finished-at="2025-02-17T12:28:42 IST" duration-ms="66860">
+      <class name="com.test.Database_Testing.Image_missing">
+        <test-method signature="testDBandListRemoteFiles()[pri:0, instance:com.test.Database_Testing.Image_missing@3b6ddd1d]" started-at="2025-02-17T12:27:35 IST" name="testDBandListRemoteFiles" finished-at="2025-02-17T12:28:42 IST" duration-ms="66835" status="PASS">
           <reporter-output>
           </reporter-output>
-        </test-method> <!-- testDB -->
-      </class> <!-- com.test.Database_Testing.demo -->
+        </test-method> <!-- testDBandListRemoteFiles -->
+      </class> <!-- com.test.Database_Testing.Image_missing -->
     </test> <!-- Default test -->
   </suite> <!-- Default suite -->
 </testng-results>

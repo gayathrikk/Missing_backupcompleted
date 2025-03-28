@@ -3,11 +3,11 @@
 <suite name="Failed suite [Default suite]" guice-stage="DEVELOPMENT">
   <test thread-count="5" name="Default test(failed)">
     <classes>
-      <class name="com.test.Database_Testing.Image_Out_Batches">
+      <class name="com.test.Database_Testing.Image_missing">
         <methods>
-          <include name="testDB"/>
+          <include name="testDBandListRemoteFiles"/>
         </methods>
-      </class> <!-- com.test.Database_Testing.Image_Out_Batches -->
+      </class> <!-- com.test.Database_Testing.Image_missing -->
     </classes>
   </test> <!-- Default test(failed) -->
 </suite> <!-- Failed suite [Default suite] -->
