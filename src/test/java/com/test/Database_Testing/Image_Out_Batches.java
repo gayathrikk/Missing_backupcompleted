@@ -150,13 +150,13 @@ public class Image_Out_Batches {
     private List<String> executeSSHCommand(String biosample, String series, String section) {
         List<String> providedFormats = new ArrayList<>();
         try {
-            String host = "ap7v1.humanbrain.in";
-            int port = 22;
+            String host = "pp6.humanbrain.in";
+            
             String user = "hbp";
-            String password = "hbp";
+            String password = "Health#123";
 
             JSch jsch = new JSch();
-            Session session = jsch.getSession(user, host, port);
+            Session session = jsch.getSession(user, host );
             session.setPassword(password);
 
             // Avoid asking for key confirmation

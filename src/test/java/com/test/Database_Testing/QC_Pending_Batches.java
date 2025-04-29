@@ -22,7 +22,7 @@ public class QC_Pending_Batches {
             Class.forName("com.mysql.cj.jdbc.Driver");
             System.out.println("Driver loaded");
 
-            String url = "jdbc:mysql://apollo2.humanbrain.in:3306/HBA_V2";
+            String url = "jdbc:mysql://dev2kamal.humanbrain.in:3306/HBA_V2";
             String username = "root";
             String password = "Health#123";
             Connection connection = DriverManager.getConnection(url, username, password);
@@ -98,8 +98,8 @@ public class QC_Pending_Batches {
 
     private void sendEmailAlert(String messageBody) {
         // Recipient's email ID needs to be mentioned.
-    	String[] to = {"karthik6595@gmail.com"};
-        String[] cc = {"richavermaj@gmail.com", "nathan.i@htic.iitm.ac.in", "divya.d@htic.iitm.ac.in", "lavanyabotcha@htic.iitm.ac.in", "venip@htic.iitm.ac.in"};
+    	String[] to = {"karthik6595@gmail.com" , "sindhu.r@htic.iitm.ac.in"};
+        String[] cc = {"richavermaj@gmail.com", "nathan.i@htic.iitm.ac.in", "divya.d@htic.iitm.ac.in", "venip@htic.iitm.ac.in"};
         String[] bcc = {};
 
         // Sender's email ID needs to be mentioned
@@ -140,9 +140,9 @@ public class QC_Pending_Batches {
             }
 
             // Set CC: header field of the header, if any.
-            for (String ccRecipient : cc) {
-                message.addRecipient(Message.RecipientType.CC, new InternetAddress(ccRecipient));
-            }
+//            for (String ccRecipient : cc) {
+//                message.addRecipient(Message.RecipientType.CC, new InternetAddress(ccRecipient));
+//            }
 
             // Set BCC: header field of the header, if any.
             for (String bccRecipient : bcc) {

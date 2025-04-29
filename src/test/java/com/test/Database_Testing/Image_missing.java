@@ -2,26 +2,26 @@ package com.test.Database_Testing;
 
 import com.jcraft.jsch.*;
 import org.testng.annotations.Test;
-
-import java.io.IOException;
 import java.io.InputStream;
 import java.sql.*;
 import java.util.*;
+import javax.mail.*;
+import javax.mail.internet.*;
 
 public class Image_missing {
 
     @Test
-    public void testDBandListRemoteFiles() {
+    public void testDBandListMissingFiles() {
         // Step 1: Connect to MySQL Database and retrieve biosample-series-section mappings
         Map<Integer, Map<String, List<Integer>>> biosampleSeriesSections = connectAndQueryDB();
 
-        // Step 2: SSH Connection and list files using grep filter
+        // Step 2: SSH Connection and check for missing lossless.jp2 files
         String host = "pp6.humanbrain.in";
         String user = "hbp";
-        String password = "Health#123";
+        String password = "Health#123"; // ⚠ Move this to a secure location.
         String basePath = "/lustre/data/store10PB/repos1/iitlab/humanbrain/analytics";
 
-        listRemoteFiles(host, user, password, basePath, biosampleSeriesSections);
+        checkMissingLosslessFiles(host, user, password, basePath, biosampleSeriesSections);
     }
 
     private Map<Integer, Map<String, List<Integer>>> connectAndQueryDB() {
@@ -47,13 +47,16 @@ public class Image_missing {
         return biosampleSeriesSections;
     }
 
+    private Map<Integer, String> biosampleBrainNames = new HashMap<>(); // Stores biosample -> brain name
+
     private Map<Integer, Map<String, List<Integer>>> executeAndPrintQuery(Connection connection) {
-        String query = "SELECT b.id AS biosample, sr.name AS series_name, s.positionindex AS section_no " +
-                "FROM section s " +
-                "INNER JOIN series sr ON s.series = sr.id " +
-                "INNER JOIN seriesset ss ON sr.seriesset = ss.id " +
-                "INNER JOIN biosample b ON ss.biosample = b.id " +
-                "WHERE DATE(s.created_ts) = DATE_SUB(CURDATE(), INTERVAL 4 DAY)";
+        String query = "SELECT b.id AS biosample, sr.name AS series_name, s.positionindex AS section_no, ss.name AS brain_name " +
+                       "FROM section s " +
+                       "INNER JOIN series sr ON s.series = sr.id " +
+                       "INNER JOIN seriesset ss ON sr.seriesset = ss.id " +
+                       "INNER JOIN biosample b ON ss.biosample = b.id " +
+                       "WHERE s.created_ts BETWEEN '2025-02-06 00:00:00' AND NOW() " +
+                       "AND (s.jp2Path IS NULL OR s.jp2Path NOT LIKE '%BFI%')";
 
         Map<Integer, Map<String, List<Integer>>> biosampleSeriesSections = new HashMap<>();
 
@@ -61,8 +64,8 @@ public class Image_missing {
              ResultSet resultSet = statement.executeQuery()) {
 
             boolean dataFound = false;
-            System.out.printf("%-20s %-20s %-10s%n", "Biosample", "Series Name", "Section No");
-            System.out.println("-".repeat(50));
+            System.out.printf("%-20s %-10s %-20s %-10s%n", "Brain Name", "Biosample", "Series Name", "Section No");
+            System.out.println("-".repeat(65));
 
             while (resultSet.next()) {
                 dataFound = true;
@@ -70,12 +73,18 @@ public class Image_missing {
                 int biosample = resultSet.getInt("biosample");
                 String seriesName = resultSet.getString("series_name");
                 int sectionNo = resultSet.getInt("section_no");
+                String brainName = resultSet.getString("brain_name");  // Extract Brain Name
 
-                System.out.printf("%-20d %-20s %-10d%n", biosample, seriesName, sectionNo);
+                // Print the query results
+                System.out.printf("%-50s %-10d %-20s %-10d%n", brainName, biosample, seriesName, sectionNo);
 
-                // Extract series suffix dynamically
+                // Store Brain Name for each Biosample
+                biosampleBrainNames.put(biosample, brainName);
+
+                // Extract suffix from series name
                 String suffix = seriesName.contains("_") ? seriesName.split("_", 2)[1] : seriesName;
 
+                // Populate the map
                 biosampleSeriesSections
                         .computeIfAbsent(biosample, k -> new HashMap<>())
                         .computeIfAbsent(suffix, k -> new ArrayList<>())
@@ -92,71 +101,147 @@ public class Image_missing {
         return biosampleSeriesSections;
     }
 
-    private void listRemoteFiles(String host, String user, String password, String basePath, Map<Integer, Map<String, List<Integer>>> biosampleSeriesSections) {
-        Session session = null;
-        ChannelExec channelExec = null;
 
+
+	 private void checkMissingLosslessFiles(String host, String user, String password, String basePath, 
+			            Map<Integer, Map<String, List<Integer>>> biosampleSeriesSections) {
+			com.jcraft.jsch.Session session = null;
+			Map<String, List<Integer>> missingSections = new HashMap<>();
+			
+			try {
+				JSch jsch = new JSch();
+				session = jsch.getSession(user, host, 22);
+				session.setPassword(password);
+				session.setConfig("StrictHostKeyChecking", "no");
+				session.connect();
+				System.out.println("\nConnected to " + host);
+			
+			for (Map.Entry<Integer, Map<String, List<Integer>>> entry : biosampleSeriesSections.entrySet()) {
+			int biosample = entry.getKey();
+			
+			for (Map.Entry<String, List<Integer>> seriesEntry : entry.getValue().entrySet()) {
+				String suffix = seriesEntry.getKey();
+				String remotePath = basePath + "/" + biosample + "/" + suffix;
+			
+			for (int sectionNo : seriesEntry.getValue()) {
+				String command1 = "ls " + remotePath + " | grep '_" + sectionNo + "_lossless.jp2'";
+				boolean fileExists = executeRemoteCommand(session, command1);
+			
+			if (!fileExists) {
+				String command2 = "ls " + remotePath + " | grep '_" + sectionNo + "_Rescan01_lossless.jp2'";
+				fileExists = executeRemoteCommand(session, command2);
+			}
+			
+			if (!fileExists) {
+				System.out.println("Missing lossless.jp2 for section " + sectionNo + " in " + remotePath);
+				missingSections.computeIfAbsent("Biosample " + biosample + " (" + suffix + ")", k -> new ArrayList<>()).add(sectionNo);
+			}
+			}
+			}
+			}
+			
+			if (!missingSections.isEmpty()) {
+			sendEmailAlert(missingSections, biosampleBrainNames);  // Pass Brain Name data
+			}
+			
+			} catch (JSchException e) {
+			System.err.println("SSH Connection error: " + e.getMessage());
+			} finally {
+			if (session != null) session.disconnect();
+			}
+			}
+
+
+    private boolean executeRemoteCommand(com.jcraft.jsch.Session session, String command) {
         try {
-            JSch jsch = new JSch();
-            session = jsch.getSession(user, host, 22);
-            session.setPassword(password);
-            session.setConfig("StrictHostKeyChecking", "no");
+            ChannelExec channelExec = (ChannelExec) session.openChannel("exec");
+            channelExec.setCommand(command);
+            channelExec.setInputStream(null);
+            channelExec.setErrStream(System.err);
 
-            try {
-                session.connect();
-                System.out.println("\nConnected to " + host);
-            } catch (JSchException e) {
-                System.err.println("Failed to connect to SSH: " + e.getMessage());
-                return;
-            }
+            InputStream input = channelExec.getInputStream();
+            channelExec.connect();
 
-            for (Map.Entry<Integer, Map<String, List<Integer>>> entry : biosampleSeriesSections.entrySet()) {
-                int biosample = entry.getKey();
+            Scanner scanner = new Scanner(input);
+            boolean fileFound = scanner.hasNextLine();
+            scanner.close();
 
-                for (Map.Entry<String, List<Integer>> seriesEntry : entry.getValue().entrySet()) {
-                    String suffix = seriesEntry.getKey(); // Extracted dynamically
-                    String remotePath = basePath + "/" + biosample + "/" + suffix;
-
-                    for (int sectionNo : seriesEntry.getValue()) {
-                        String command = "ls " + remotePath + " | grep _" + sectionNo + "_";
-
-                        try {
-                            channelExec = (ChannelExec) session.openChannel("exec");
-                            channelExec.setCommand(command);
-                            channelExec.setInputStream(null);
-                            channelExec.setErrStream(System.err);
-
-                            InputStream input = channelExec.getInputStream();
-                            channelExec.connect();
-
-                            System.out.println("\nFiltered files in: " + remotePath + " for section " + sectionNo);
-                            Scanner scanner = new Scanner(input);
-                            boolean fileFound = false;
-                            while (scanner.hasNextLine()) {
-                                fileFound = true;
-                                System.out.println(" - " + scanner.nextLine());
-                            }
-                            if (!fileFound) {
-                                System.out.println(" - No files found for section " + sectionNo);
-                            }
-                            scanner.close();
-                        } catch (JSchException | IOException e) {
-                            System.err.println("Error executing command: " + command + " - " + e.getMessage());
-                        } finally {
-                            if (channelExec != null) {
-                                channelExec.disconnect();
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (JSchException e) {
-            System.err.println("SSH Connection error: " + e.getMessage());
-        } finally {
-            if (session != null) {
-                session.disconnect();
-            }
-            System.out.println("SSH Connection closed.");
+            channelExec.disconnect();
+            return fileFound;
+        } catch (Exception e) {
+            System.err.println("Error executing command: " + command + " - " + e.getMessage());
+            return false;
         }
     }
+
+    private void sendEmailAlert(Map<String, List<Integer>> missingSections, Map<Integer, String> biosampleBrainNames) {
+    	String[] to = {"karthik6595@gmail.com", "sindhu.r@htic.iitm.ac.in"};
+        String[] cc = {"richavermaj@gmail.com", "nathan.i@htic.iitm.ac.in", "divya.d@htic.iitm.ac.in", "venip@htic.iitm.ac.in"};
+        String from = "gayathri@htic.iitm.ac.in";
+        String password = "Gayu@0918"; 
+        String host = "smtp.gmail.com";
+
+        Properties properties = System.getProperties();
+        properties.put("mail.smtp.host", host);
+        properties.put("mail.smtp.port", "465");
+        properties.put("mail.smtp.ssl.enable", "true");
+        properties.put("mail.smtp.auth", "true");
+
+        javax.mail.Session mailSession = javax.mail.Session.getInstance(properties, new javax.mail.Authenticator() {
+            protected PasswordAuthentication getPasswordAuthentication() {
+                return new PasswordAuthentication(from, password);
+            }
+        });
+
+        try {
+            MimeMessage message = new MimeMessage(mailSession);
+            message.setFrom(new InternetAddress(from));
+            for (String recipient : to) {
+                message.addRecipient(Message.RecipientType.TO, new InternetAddress(recipient));
+            }
+           
+            for (String ccRecipient : cc) {
+                message.addRecipient(Message.RecipientType.CC, new InternetAddress(ccRecipient));
+            }
+            message.setSubject("Alert: Rescan Issues");
+
+            StringBuilder emailBody = new StringBuilder("<html><body>");
+            emailBody.append("<b>This is an automatically generated email,</b><br><br>");
+            emailBody.append("For your attention and action:<br>");
+            emailBody.append("<h3>The following images are missing on the viewer page</h3>");
+            emailBody.append("<table border='1'>")
+                     .append("<tr><th>Brain Name</th><th>Biosample (Series)</th><th>Missing Sections</th></tr>");
+
+            for (Map.Entry<String, List<Integer>> entry : missingSections.entrySet()) {
+                String biosampleSeries = entry.getKey();
+                String brainName = "Unknown"; 
+
+                // Extract biosample ID from the key
+                String[] parts = biosampleSeries.split(" ");
+                if (parts.length > 1) {
+                    try {
+                        int biosample = Integer.parseInt(parts[1]);
+                        brainName = biosampleBrainNames.getOrDefault(biosample, "Unknown");
+                    } catch (NumberFormatException ignored) { }
+                }
+
+                emailBody.append("<tr>")
+                         .append("<td>").append(brainName)
+                         .append("<td>").append(biosampleSeries)
+                         .append("<td>").append(entry.getValue())
+                         .append("</tr>");
+            }
+
+            emailBody.append("</table></body></html>");
+
+            message.setContent(emailBody.toString(), "text/html");
+
+            Transport.send(message);
+            System.out.println("Email sent successfully !");
+
+        } catch (MessagingException e) {
+            e.printStackTrace();
+        }
+    }
+
 }

@@ -9,20 +9,17 @@ import java.sql.Date;
 import java.util.*;
 import javax.mail.*;
 import javax.mail.internet.*;
-import java.util.Properties;
 
 public class Image_missing2 {
     public static void main(String[] args) {
-        // Database credentials
         String url = "jdbc:mysql://apollo2.humanbrain.in:3306/HBA_V2";
         String username = "root";
         String password = "Health#123";
 
-        // SQL Query
         String query = "SELECT sb.id, sb.name, sb.datalocation, sb.process_status, sb.arrival_date, s.filename "
                 + "FROM `slidebatch` sb "
                 + "JOIN `slide` s ON sb.id = s.slidebatch "
-                + "WHERE DATE(sb.arrival_date) IN (CURDATE(), DATE_SUB(CURDATE(), INTERVAL 3 DAY))";
+                + "WHERE DATE(sb.arrival_date) IN (CURDATE(), DATE_SUB(CURDATE(), INTERVAL 5 DAY))";
 
         try (Connection conn = DriverManager.getConnection(url, username, password);
              Statement stmt = conn.createStatement();
@@ -30,6 +27,7 @@ public class Image_missing2 {
 
             Map<String, List<String>> filenameRecordMap = new HashMap<>();
             Map<String, Integer> filenameCountMap = new HashMap<>();
+            Set<String> filenamesWithProcessStatus8 = new HashSet<>();
 
             while (rs.next()) {
                 int batchId = rs.getInt("id");
@@ -39,16 +37,18 @@ public class Image_missing2 {
                 Date arrivalDate = rs.getDate("arrival_date");
                 String filename = rs.getString("filename");
 
-                // Include process status in console record
                 String consoleRecord = String.format("%-10d %-40s %-30s %-20d %-20s %-30s",
                         batchId, name, datalocation, processStatus, arrivalDate, filename);
 
-                // Exclude process status from email record
                 String emailRecord = String.format("%-10d %-40s %-30s %-20s %-30s",
                         batchId, name, datalocation, arrivalDate, filename);
 
                 filenameRecordMap.computeIfAbsent(filename, k -> new ArrayList<>()).add(consoleRecord + "|" + emailRecord);
                 filenameCountMap.put(filename, filenameCountMap.getOrDefault(filename, 0) + 1);
+
+                if (processStatus == 8) {
+                    filenamesWithProcessStatus8.add(filename);
+                }
             }
 
             Set<String> repeatedFilenames = new HashSet<>();
@@ -70,41 +70,56 @@ public class Image_missing2 {
                 emailBody.append("<p>This is an automatically generated email,<br>For your attention and action:</p>");
                 emailBody.append("<p><strong>Alert:</strong> The following images have multiple scans with pending processing.</p>");
 
+                boolean emailContentExists = false;
+
                 for (String filename : repeatedFilenames) {
                     consoleOutput.append("\nFilename: ").append(filename).append("\n");
                     consoleOutput.append("---------------------------------------------------------------------------------------------------------------------------\n");
 
                     emailBody.append("<p><strong>Filename:</strong> ").append(filename).append("</p>");
-                    emailBody.append("<table border='1' cellpadding='5' cellspacing='0' style='border-collapse:collapse;'>");
-                    emailBody.append("<tr><th>Batch ID</th><th>Name</th><th>Data Location</th><th>Arrival Date</th><th>Filename</th></tr>");
+
+                    boolean addToEmail = !filenamesWithProcessStatus8.contains(filename);
+
+                    if (addToEmail) {
+                        emailContentExists = true;
+                        emailBody.append("<table border='1' cellpadding='5' cellspacing='0' style='border-collapse:collapse;'>");
+                        emailBody.append("<tr><th>Batch ID</th><th>Name</th><th>Data Location</th><th>Arrival Date</th><th>Filename</th></tr>");
+                    }
 
                     for (String combinedRecord : filenameRecordMap.get(filename)) {
                         String[] records = combinedRecord.split("\\|");
                         String consoleRecord = records[0];
                         String emailRecord = records[1];
 
-                        // Print full details (including process status) to console
                         consoleOutput.append(consoleRecord).append("\n");
 
-                        // Populate email table without process status
-                        String[] emailParts = emailRecord.trim().split("\\s{2,}");
-                        emailBody.append("<tr>")
-                                 .append("<td>").append(emailParts[0]).append("</td>")
-                                 .append("<td>").append(emailParts[1]).append("</td>")
-                                 .append("<td>").append(emailParts[2]).append("</td>")
-                                 .append("<td>").append(emailParts[3]).append("</td>")
-                                 .append("<td>").append(emailParts[4]).append("</td>")
-                                 .append("</tr>");
+                        if (addToEmail) {
+                            String[] emailParts = emailRecord.trim().split("\\s{2,}");
+                            emailBody.append("<tr>")
+                                     .append("<td>").append(emailParts[0]).append("</td>")
+                                     .append("<td>").append(emailParts[1]).append("</td>")
+                                     .append("<td>").append(emailParts[2]).append("</td>")
+                                     .append("<td>").append(emailParts[3]).append("</td>")
+                                     .append("<td>").append(emailParts[4]).append("</td>")
+                                     .append("</tr>");
+                        }
                     }
 
-                    emailBody.append("</table><br>"); // Space between groups of filenames
+                    if (addToEmail) {
+                        emailBody.append("</table><br>");
+                    }
                 }
 
                 emailBody.append("<p><strong>Note:</strong> Please rescan the images only after the previous ones reach the out stages.</p>");
                 emailBody.append("</body></html>");
 
-                System.out.println(consoleOutput.toString()); // Print output with process status to console
-                sendEmailAlert(emailBody.toString()); // Send email excluding process status
+                System.out.println(consoleOutput.toString());
+
+                if (emailContentExists) {
+                    sendEmailAlert(emailBody.toString());
+                } else {
+                    System.out.println("No filenames to include in the email (all have process status 8).\n");
+                }
 
             } else {
                 System.out.println("No repeated filenames detected for the given date range.");
@@ -116,21 +131,13 @@ public class Image_missing2 {
     }
 
     private static void sendEmailAlert(String messageBody) {
-    	String[] to = {"karthik6595@gmail.com",
-    			       "sindhu.r@htic.iitm.ac.in"};
-    			       
-        String[] cc = {"richavermaj@gmail.com", 
-        		       "nathan.i@htic.iitm.ac.in", 
-        		       "divya.d@htic.iitm.ac.in", 
-        		       "venip@htic.iitm.ac.in"};
-
+        String[] to = {"gayuriche26@gmail.com"};
         String from = "gayathri@htic.iitm.ac.in";
         final String emailUser = "gayathri@htic.iitm.ac.in";
         final String emailPassword = "Gayu@0918";
 
-        String host = "smtp.gmail.com";
         Properties properties = new Properties();
-        properties.put("mail.smtp.host", host);
+        properties.put("mail.smtp.host", "smtp.gmail.com");
         properties.put("mail.smtp.port", "465");
         properties.put("mail.smtp.ssl.enable", "true");
         properties.put("mail.smtp.auth", "true");
@@ -144,15 +151,9 @@ public class Image_missing2 {
         try {
             MimeMessage message = new MimeMessage(session);
             message.setFrom(new InternetAddress(from));
-
             for (String recipient : to) {
                 message.addRecipient(Message.RecipientType.TO, new InternetAddress(recipient));
             }
-            
-            for (String ccRecipient : cc) {
-                message.addRecipient(Message.RecipientType.CC, new InternetAddress(ccRecipient));
-            }
-
             message.setSubject("Scanning Alert");
             message.setContent(messageBody, "text/html");
 

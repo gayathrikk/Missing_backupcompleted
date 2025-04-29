@@ -2,15 +2,15 @@
 <testng-results ignored="0" total="1" passed="1" failed="0" skipped="0">
   <reporter-output>
   </reporter-output>
-  <suite started-at="2025-02-17T12:27:35 IST" name="Default suite" finished-at="2025-02-17T12:28:42 IST" duration-ms="66860">
+  <suite started-at="2025-03-03T12:11:11 IST" name="Default suite" finished-at="2025-03-03T12:13:18 IST" duration-ms="126952">
     <groups>
     </groups>
-    <test started-at="2025-02-17T12:27:35 IST" name="Default test" finished-at="2025-02-17T12:28:42 IST" duration-ms="66860">
+    <test started-at="2025-03-03T12:11:11 IST" name="Default test" finished-at="2025-03-03T12:13:18 IST" duration-ms="126952">
       <class name="com.test.Database_Testing.Image_missing">
-        <test-method signature="testDBandListRemoteFiles()[pri:0, instance:com.test.Database_Testing.Image_missing@3b6ddd1d]" started-at="2025-02-17T12:27:35 IST" name="testDBandListRemoteFiles" finished-at="2025-02-17T12:28:42 IST" duration-ms="66835" status="PASS">
+        <test-method signature="testDBandListMissingFiles()[pri:0, instance:com.test.Database_Testing.Image_missing@f5acb9d]" started-at="2025-03-03T12:11:11 IST" name="testDBandListMissingFiles" finished-at="2025-03-03T12:13:18 IST" duration-ms="126930" status="PASS">
           <reporter-output>
           </reporter-output>
-        </test-method> <!-- testDBandListRemoteFiles -->
+        </test-method> <!-- testDBandListMissingFiles -->
       </class> <!-- com.test.Database_Testing.Image_missing -->
     </test> <!-- Default test -->
   </suite> <!-- Default suite -->
