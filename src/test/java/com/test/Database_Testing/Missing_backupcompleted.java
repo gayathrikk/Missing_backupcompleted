@@ -28,7 +28,7 @@ public class Missing_backupcompleted {
     private final String emailPassword = "wjzcgaramsqvagxu"; // Gmail App Password
 
     @Test
-    public void checkMissingbackupcompleted.jsonFiles() {
+    public void checkMissingbackupcompletedFiles() {
         StringBuilder missingFolders = new StringBuilder();
 
         try {
@@ -166,3 +166,4 @@ public class Missing_backupcompleted {
         }
     }
 }
+
