@@ -21,8 +21,7 @@ public class Missing_backupcompleted {
     // ✅ Email recipients
     private final String[] to = {
         "ramanan@htic.iitm.ac.in",
-        "nitheshkumar.s@htic.iitm.ac.in",
-        "praveensp1010@gmail.com"
+        "nitheshkumar.s@htic.iitm.ac.in"
     };
 
     private final String from = "automationsoftware25@gmail.com";
