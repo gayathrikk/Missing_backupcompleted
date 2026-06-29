@@ -25,7 +25,7 @@ public class Missing_backupcompleted {
     };
 
     private final String from = "automationsoftware25@gmail.com";
-    private final String emailPassword = "wjzcgaramsqvagxu"; // Gmail App Password
+    private final String emailPassword = "cbsiopyovcrwyblp"; // Gmail App Password
 
     @Test
     public void checkMissingbackupcompletedFiles() {
